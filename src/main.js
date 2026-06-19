@@ -281,11 +281,14 @@ async function handleExportScenario() {
   }
 
   try {
-    if (typeof adapter.exportScenario === 'function') {
-      await adapter.exportScenario({ path, payload: exportPayload, state: getStateSnapshot() })
+    const exportResult =
+      typeof adapter.exportScenario === 'function'
+        ? await adapter.exportScenario({ path, payload: exportPayload, state: getStateSnapshot() })
+        : null
+    if (exportResult?.download !== false) {
+      downloadScenario(path, exportPayload)
     }
-    downloadScenario(path, exportPayload)
-    state.status = `Szenario exportiert: ${path}`
+    state.status = exportResult?.status ?? `Szenario exportiert: ${path}`
   } catch (error) {
     appendMessage('assistant', `Der Export ist fehlgeschlagen: ${error.message}`)
     state.status = 'Fehler beim Export'
@@ -517,7 +520,7 @@ function registerBridge() {
       render()
     },
     resetSession() {
-      handleResetSession()
+      return handleResetSession()
     },
     getState() {
       return getStateSnapshot()
@@ -697,7 +700,8 @@ function extractColumnMeta(source, index) {
 }
 
 function normalizeRequirements(requirements) {
-  return [...new Set(requirements.map((item) => item.trim()).filter(Boolean))]
+  const list = Array.isArray(requirements) ? requirements : String(requirements ?? '').split(/\n+/)
+  return [...new Set(list.map((item) => item.trim()).filter(Boolean))]
 }
 
 function projectPoint(lat, lon) {
