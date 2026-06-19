@@ -27,6 +27,7 @@ const AIRPORTS = {
 // Maximale Anzahl an Chatnachrichten, die als Kontext an das LLM gesendet werden
 const MAX_CONTEXT_MESSAGES = 8
 
+let plotlyInitialized = false
 
 const state = {
   messages: [
@@ -97,7 +98,7 @@ app.innerHTML = `
 
         <form class="chat-form" data-chat-form>
           <label class="sr-only" for="chat-input">Nachricht an den Analyzing Agent</label>
-          <textarea id="chat-input" name="input_message" rows="3" maxlength="1500" placeholder="Beschreibe Route, Zeitraum, Flughäfen, Fluggerät …"></textarea>
+          <textarea id="chat-input" name="input_message" rows="3" placeholder="Beschreibe Route, Zeitraum, Flughäfen, Fluggerät …"></textarea>
           <div class="chat-actions">
             <p class="hint">Enter = Senden · Shift+Enter = Zeilenumbruch · <code>input_message</code> an den Workflow</p>
             <button class="primary-button" type="submit">Senden</button>
@@ -185,7 +186,7 @@ async function handleMessageSubmit(event) {
   refs.chatInput.value = ''
   state.isAnalyzing = true
   state.status = 'Analyzing Agent verarbeitet die Anfrage'
-  renderStatus()
+  render()
 
   try {
     const result = await adapter.handleInputMessage(inputMessage, getStateSnapshot())
@@ -209,7 +210,7 @@ async function handleMessageSubmit(event) {
 }
 
 async function handleStartSearch() {
-  if (!state.requirements.length || state.isSearching) {
+  if (state.isSearching) {
     return
   }
 
@@ -300,13 +301,23 @@ function render() {
   renderPlotlyMap()
   renderStatus()
   refs.chatState.textContent = state.isAnalyzing ? 'Analysiert…' : 'Bereit'
-  refs.startSearch.disabled = !state.requirements.length || state.isSearching || state.isAnalyzing
+  refs.startSearch.disabled = state.isSearching || state.isAnalyzing
   refs.startSearch.textContent = state.isSearching ? 'Searching…' : 'Start Search'
   refs.exportScenario.disabled = !state.scenario.flights.length
 }
 
 function renderMessages() {
-  refs.chatLog.innerHTML = state.messages
+  const loadingMarkup = state.isAnalyzing
+    ? `
+        <article class="message message-assistant message-loading" aria-live="polite">
+          <span class="message-meta">Agent · wartet auf Antwort …</span>
+          <p><span class="loading-spinner" aria-hidden="true"></span></p>
+        </article>
+      `
+    : ''
+
+  refs.chatLog.innerHTML =
+    state.messages
     .map(
       (message) => `
         <article class="message message-${message.role}">
@@ -315,7 +326,7 @@ function renderMessages() {
         </article>
       `,
     )
-    .join('')
+    .join('') + loadingMarkup
   refs.chatLog.scrollTop = refs.chatLog.scrollHeight
 }
 
@@ -334,8 +345,6 @@ function renderRequirements() {
         .join('')
     : '<li class="requirements-empty">Noch keine Requirements definiert.</li>'
 }
-
-let plotlyInitialized = false
 
 function renderPlotlyMap() {
   const flights = state.scenario.flights
@@ -561,7 +570,7 @@ function createLlmAdapter() {
     },
     async runCuratorSearch(requirements, snapshot) {
       return await callLlm(
-        `Starte die Suche basierend auf diesen Requirements: ${requirements.join(' | ')}. Generiere einen konkreten Flugtrack.`,
+        `Starte die Suche basierend auf diesen Requirements: ${requirements.length ? requirements.join(' | ') : 'Keine vorgegebenen Requirements'}. Generiere einen konkreten Flugtrack.`,
         snapshot,
       )
     },
