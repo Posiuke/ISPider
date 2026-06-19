@@ -569,8 +569,9 @@ function createLlmAdapter() {
       return await callLlm(inputMessage, snapshot)
     },
     async runCuratorSearch(requirements, snapshot) {
+      const requirementsText = formatRequirementsForSearch(requirements)
       return await callLlm(
-        `Starte die Suche basierend auf diesen Requirements: ${requirements.length ? requirements.join(' | ') : 'Keine vorgegebenen Requirements'}. Generiere einen konkreten Flugtrack.`,
+        `Starte die Suche basierend auf diesen Requirements: ${requirementsText}. Generiere einen konkreten Flugtrack.`,
         snapshot,
       )
     },
@@ -698,6 +699,10 @@ function deriveRequirements(inputMessage, existingRequirements) {
 function buildAnalyzingReply(requirements) {
   const focus = requirements.slice(-2).join(' / ')
   return `Ich habe die Requirements aktualisiert. Aktueller Fokus: ${focus}. Falls nötig, kannst du die Suche jetzt starten oder weitere Constraints ergänzen.`
+}
+
+function formatRequirementsForSearch(requirements) {
+  return requirements.length ? requirements.join(' | ') : 'Keine vorgegebenen Requirements'
 }
 
 function createMockFlight(requirements, ordinal) {
