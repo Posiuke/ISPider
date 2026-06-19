@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# ISPider local configuration (may contain API keys – do not commit)
+ispider.config.js

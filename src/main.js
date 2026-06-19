@@ -1,7 +1,12 @@
 import './style.css'
+import Plotly from 'plotly.js-dist-min'
 
-const MAP_WIDTH = 1000
-const MAP_HEIGHT = 460
+// ── Konfiguration aus Property-Datei ────────────────────────────────────────
+const CONFIG = window.ISPIDER_CONFIG ?? {}
+const LLM_CONFIG = CONFIG.llm ?? {}
+const EXPORT_CONFIG = CONFIG.export ?? {}
+
+// ── Statische Daten ──────────────────────────────────────────────────────────
 const AIRPORTS = {
   FRA: { label: 'Frankfurt', lat: 50.0379, lon: 8.5622 },
   MUC: { label: 'München', lat: 48.3538, lon: 11.7861 },
@@ -18,14 +23,10 @@ const AIRPORTS = {
   HND: { label: 'Tokio', lat: 35.5494, lon: 139.7798 },
   SYD: { label: 'Sydney', lat: -33.9399, lon: 151.1753 },
 }
-const CONTINENTS = [
-  'M110 82 L180 60 L248 78 L275 120 L252 168 L222 196 L174 188 L126 156 L96 116 Z',
-  'M228 214 L262 236 L286 300 L272 382 L236 410 L220 350 L210 274 Z',
-  'M430 86 L472 72 L534 80 L558 118 L530 140 L476 136 L438 120 Z',
-  'M458 144 L512 154 L566 186 L604 266 L590 362 L532 394 L472 352 L446 272 L430 194 Z',
-  'M588 88 L656 74 L756 98 L842 126 L886 182 L860 224 L786 214 L730 164 L676 154 L618 142 Z',
-  'M772 304 L836 326 L864 372 L816 398 L752 372 L740 332 Z',
-]
+
+// Maximale Anzahl an Chatnachrichten, die als Kontext an das LLM gesendet werden
+const MAX_CONTEXT_MESSAGES = 8
+
 
 const state = {
   messages: [
@@ -41,7 +42,7 @@ const state = {
   selectedFlightId: null,
   isAnalyzing: false,
   isSearching: false,
-  exportPath: 'ispider-szenario.scenario',
+  exportPath: EXPORT_CONFIG.path ?? 'ispider-szenario.scenario',
   status: 'Sitzung bereit',
 }
 
@@ -51,46 +52,16 @@ const adapter = createAdapter()
 app.innerHTML = `
   <main class="app-shell">
     <section class="panel map-panel">
-      <div class="panel-header map-header">
+      <div class="map-header">
         <div>
           <p class="eyebrow">Interactive scenario canvas</p>
           <h1>ISPider Flight Scenario Builder</h1>
-          <p class="subtitle">Dominante Weltkarte für Schritt-für-Schritt-Szenarien aus Agenten-Workflows.</p>
-        </div>
-        <div class="brand-badge" aria-label="ISPider Logo">
-          <svg viewBox="0 0 128 128" role="img" aria-hidden="true">
-            <defs>
-              <linearGradient id="spiderGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#76f7ff" />
-                <stop offset="100%" stop-color="#8b5cf6" />
-              </linearGradient>
-            </defs>
-            <circle cx="64" cy="64" r="52" fill="rgba(11, 17, 32, 0.55)" stroke="url(#spiderGlow)" stroke-width="2" />
-            <ellipse cx="64" cy="54" rx="18" ry="22" fill="url(#spiderGlow)" opacity="0.92" />
-            <circle cx="64" cy="80" r="15" fill="url(#spiderGlow)" opacity="0.86" />
-            <circle cx="58" cy="49" r="2.5" fill="#08111f" />
-            <circle cx="70" cy="49" r="2.5" fill="#08111f" />
-            <path d="M45 43 L20 24 M43 55 L12 55 M45 67 L20 86 M83 43 L108 24 M85 55 L116 55 M83 67 L108 86 M57 97 L47 111 M71 97 L81 111" stroke="url(#spiderGlow)" stroke-width="4" stroke-linecap="round" />
-          </svg>
-          <span>Dark Holo</span>
+          <p class="subtitle">Plotly Weltkarte für Schritt-für-Schritt-Szenarien aus Agenten-Workflows.</p>
         </div>
       </div>
 
       <div class="map-stage">
-        <svg class="world-map" viewBox="0 0 ${MAP_WIDTH} ${MAP_HEIGHT}" aria-labelledby="mapTitle mapDesc" role="img">
-          <title id="mapTitle">Szenario-Weltkarte</title>
-          <desc id="mapDesc">Zeigt aktuelle Flugplan-Tracks und Metadaten des generierten Szenarios.</desc>
-          <defs>
-            <linearGradient id="trackGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="#7dd3fc" />
-              <stop offset="100%" stop-color="#8b5cf6" />
-            </linearGradient>
-          </defs>
-          <rect x="0" y="0" width="${MAP_WIDTH}" height="${MAP_HEIGHT}" rx="24" class="map-ocean"></rect>
-          <g class="map-grid">${buildGrid()}</g>
-          <g class="map-continents">${CONTINENTS.map((path) => `<path d="${path}" />`).join('')}</g>
-          <g data-map-tracks></g>
-        </svg>
+        <div id="plotly-map" class="plotly-map"></div>
         <div class="map-empty-state" data-empty-state>
           <strong>Noch kein Szenario visualisiert</strong>
           <span>Requirements im Chat festlegen und anschließend die Suche starten.</span>
@@ -126,10 +97,10 @@ app.innerHTML = `
 
         <form class="chat-form" data-chat-form>
           <label class="sr-only" for="chat-input">Nachricht an den Analyzing Agent</label>
-          <textarea id="chat-input" name="input_message" rows="4" maxlength="1500" placeholder="Beschreibe Route, Zeitraum, Flughäfen, Fluggerät oder weitere Anforderungen..."></textarea>
+          <textarea id="chat-input" name="input_message" rows="3" maxlength="1500" placeholder="Beschreibe Route, Zeitraum, Flughäfen, Fluggerät …"></textarea>
           <div class="chat-actions">
-            <p class="hint">Nachricht wird als <code>input_message</code> an den Workflow übergeben.</p>
-            <button class="primary-button" type="submit">Nachricht senden</button>
+            <p class="hint">Enter = Senden · Shift+Enter = Zeilenumbruch · <code>input_message</code> an den Workflow</p>
+            <button class="primary-button" type="submit">Senden</button>
           </div>
         </form>
       </section>
@@ -156,10 +127,6 @@ app.innerHTML = `
 
           <div class="workflow-actions">
             <button class="primary-button" type="button" data-start-search>Start Search</button>
-            <label class="export-field" for="export-path">
-              <span>Export-Pfad / Dateiname</span>
-              <input id="export-path" type="text" value="${escapeAttribute(state.exportPath)}" placeholder="ispider-szenario.scenario" />
-            </label>
             <button class="secondary-button" type="button" data-export-scenario>Export Scenario</button>
             <button class="ghost-button" type="button" data-reset-session>Reset Session</button>
           </div>
@@ -179,20 +146,17 @@ const refs = {
   startSearch: app.querySelector('[data-start-search]'),
   exportScenario: app.querySelector('[data-export-scenario]'),
   resetSession: app.querySelector('[data-reset-session]'),
-  exportPath: app.querySelector('#export-path'),
-  tracks: app.querySelector('[data-map-tracks]'),
+  plotlyMap: app.querySelector('#plotly-map'),
   emptyState: app.querySelector('[data-empty-state]'),
   scenarioMeta: app.querySelector('[data-scenario-meta]'),
   statusText: app.querySelector('[data-status-text]'),
 }
 
 refs.chatForm.addEventListener('submit', handleMessageSubmit)
+refs.chatInput.addEventListener('keydown', handleChatKeydown)
 refs.startSearch.addEventListener('click', handleStartSearch)
 refs.exportScenario.addEventListener('click', handleExportScenario)
 refs.resetSession.addEventListener('click', handleResetSession)
-refs.exportPath.addEventListener('input', (event) => {
-  state.exportPath = event.target.value.trim() || 'ispider-szenario.scenario'
-})
 
 render()
 registerBridge()
@@ -200,6 +164,15 @@ if (typeof adapter.attach === 'function') {
   adapter.attach(window.ISPIDER_APP)
 }
 window.dispatchEvent(new CustomEvent('ispider:ready'))
+
+// ── Event-Handler ────────────────────────────────────────────────────────────
+
+function handleChatKeydown(event) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault()
+    refs.chatForm.requestSubmit()
+  }
+}
 
 async function handleMessageSubmit(event) {
   event.preventDefault()
@@ -269,7 +242,6 @@ async function handleExportScenario() {
 
   const path = ensureScenarioExtension(state.exportPath)
   state.exportPath = path
-  refs.exportPath.value = path
   state.status = 'Szenario wird exportiert'
   renderStatus()
 
@@ -315,14 +287,17 @@ async function handleResetSession() {
   state.status = 'Sitzung bereit'
   state.isAnalyzing = false
   state.isSearching = false
+  state.exportPath = EXPORT_CONFIG.path ?? 'ispider-szenario.scenario'
   refs.chatInput.value = ''
   render()
 }
 
+// ── Render-Funktionen ────────────────────────────────────────────────────────
+
 function render() {
   renderMessages()
   renderRequirements()
-  renderMap()
+  renderPlotlyMap()
   renderStatus()
   refs.chatState.textContent = state.isAnalyzing ? 'Analysiert…' : 'Bereit'
   refs.startSearch.disabled = !state.requirements.length || state.isSearching || state.isAnalyzing
@@ -335,10 +310,7 @@ function renderMessages() {
     .map(
       (message) => `
         <article class="message message-${message.role}">
-          <header>
-            <strong>${message.role === 'assistant' ? 'Analyzing Agent' : 'User'}</strong>
-            <span>${escapeHtml(message.timestamp)}</span>
-          </header>
+          <span class="message-meta">${message.role === 'assistant' ? 'Agent' : 'Du'} · ${escapeHtml(message.timestamp)}</span>
           <p>${escapeHtml(message.content)}</p>
         </article>
       `,
@@ -363,43 +335,105 @@ function renderRequirements() {
     : '<li class="requirements-empty">Noch keine Requirements definiert.</li>'
 }
 
-function renderMap() {
+let plotlyInitialized = false
+
+function renderPlotlyMap() {
   const flights = state.scenario.flights
   refs.emptyState.hidden = flights.length > 0
-  refs.tracks.innerHTML = flights
-    .map((flight, index) => {
-      const selected = flight.id === state.selectedFlightId || (!state.selectedFlightId && index === flights.length - 1)
-      const polyline = flight.track
-        .map((point) => projectPoint(point.lat, point.lon))
-        .map((point) => `${point.x},${point.y}`)
-        .join(' ')
-      const waypoints = flight.track
-        .map((point) => {
-          const projected = projectPoint(point.lat, point.lon)
-          return `<circle class="track-waypoint" cx="${projected.x}" cy="${projected.y}" r="4"></circle>`
-        })
-        .join('')
-      return `
-        <g class="track-group ${selected ? 'selected' : ''}" data-flight-id="${escapeAttribute(flight.id)}">
-          <polyline class="track-line" points="${polyline}"></polyline>
-          ${waypoints}
-          <text x="${projectPoint(flight.track[flight.track.length - 1].lat, flight.track[flight.track.length - 1].lon).x + 10}" y="${projectPoint(flight.track[flight.track.length - 1].lat, flight.track[flight.track.length - 1].lon).y - 10}" class="track-label">${escapeHtml(flight.label)}</text>
-        </g>
-      `
-    })
-    .join('')
 
-  refs.tracks.querySelectorAll('.track-group').forEach((trackElement) => {
-    trackElement.addEventListener('click', () => {
-      state.selectedFlightId = trackElement.dataset.flightId
-      renderMap()
-    })
+  const traces = flights.map((flight, index) => {
+    const isSelected =
+      flight.id === state.selectedFlightId || (!state.selectedFlightId && index === flights.length - 1)
+    return {
+      type: 'scattergeo',
+      mode: 'lines+markers',
+      lat: flight.track.map((p) => p.lat),
+      lon: flight.track.map((p) => p.lon),
+      line: {
+        width: isSelected ? 4 : 2.5,
+        color: isSelected ? '#f8fafc' : '#7dd3fc',
+      },
+      marker: {
+        size: isSelected ? 7 : 4,
+        color: isSelected ? '#f8fafc' : '#bfdbfe',
+        symbol: 'circle',
+      },
+      name: flight.label,
+      text: flight.track.map((_, i) => (i === 0 || i === flight.track.length - 1 ? flight.label : '')),
+      hovertemplate: `<b>${escapeHtml(flight.label)}</b><br>Lat: %{lat:.3f}<br>Lon: %{lon:.3f}<extra></extra>`,
+      customdata: [flight.id],
+    }
   })
 
+  // Leerer Platzhalter-Trace, damit die Karte auch ohne Flüge dargestellt wird
+  if (!traces.length) {
+    traces.push({ type: 'scattergeo', lat: [], lon: [], showlegend: false })
+  }
+
+  const layout = {
+    geo: {
+      showland: true,
+      landcolor: 'rgba(60, 100, 120, 0.45)',
+      showocean: true,
+      oceancolor: 'rgba(11, 20, 38, 0.92)',
+      showcountries: true,
+      countrycolor: 'rgba(118, 247, 255, 0.25)',
+      showframe: false,
+      showcoastlines: true,
+      coastlinecolor: 'rgba(118, 247, 255, 0.35)',
+      showlakes: false,
+      showrivers: false,
+      bgcolor: 'rgba(0,0,0,0)',
+      projection: { type: 'natural earth' },
+      lataxis: { showgrid: true, gridcolor: 'rgba(148, 163, 184, 0.12)', gridwidth: 1 },
+      lonaxis: { showgrid: true, gridcolor: 'rgba(148, 163, 184, 0.12)', gridwidth: 1 },
+    },
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    margin: { l: 0, r: 0, t: 0, b: 0 },
+    showlegend: false,
+    font: { color: '#94a3b8', family: 'Inter, system-ui, sans-serif' },
+    hoverlabel: {
+      bgcolor: 'rgba(8, 15, 30, 0.95)',
+      bordercolor: 'rgba(118, 247, 255, 0.4)',
+      font: { color: '#dbe4ff' },
+    },
+  }
+
+  const config = {
+    displayModeBar: false,
+    responsive: true,
+    scrollZoom: true,
+  }
+
+  if (plotlyInitialized) {
+    Plotly.react(refs.plotlyMap, traces, layout, config)
+  } else {
+    Plotly.newPlot(refs.plotlyMap, traces, layout, config)
+    plotlyInitialized = true
+
+    refs.plotlyMap.on('plotly_click', (data) => {
+      if (data.points.length) {
+        const clickedTrace = flights[data.points[0].curveNumber]
+        if (clickedTrace) {
+          state.selectedFlightId = clickedTrace.id
+          renderPlotlyMap()
+          renderScenarioMeta()
+        }
+      }
+    })
+  }
+
+  renderScenarioMeta()
+}
+
+function renderScenarioMeta() {
+  const flights = state.scenario.flights
   refs.scenarioMeta.innerHTML = flights.length
     ? flights
         .map((flight, index) => {
-          const isSelected = flight.id === state.selectedFlightId || (!state.selectedFlightId && index === flights.length - 1)
+          const isSelected =
+            flight.id === state.selectedFlightId || (!state.selectedFlightId && index === flights.length - 1)
           return `
             <button class="flight-card ${isSelected ? 'selected' : ''}" type="button" data-flight-card="${escapeAttribute(flight.id)}">
               <strong>${escapeHtml(flight.label)}</strong>
@@ -414,7 +448,7 @@ function renderMap() {
   refs.scenarioMeta.querySelectorAll('[data-flight-card]').forEach((card) => {
     card.addEventListener('click', () => {
       state.selectedFlightId = card.dataset.flightCard
-      renderMap()
+      renderPlotlyMap()
     })
   })
 }
@@ -422,6 +456,8 @@ function renderMap() {
 function renderStatus() {
   refs.statusText.textContent = state.status
 }
+
+// ── Zustandsmutationen ───────────────────────────────────────────────────────
 
 function appendMessage(role, content) {
   state.messages.push({ role, content, timestamp: timestamp() })
@@ -453,6 +489,8 @@ function getStateSnapshot() {
   )
 }
 
+// ── Adapter / LLM-Integration ────────────────────────────────────────────────
+
 function createAdapter() {
   const externalAdapter = window.ISPIDER_CONFIG?.adapter
   if (externalAdapter) {
@@ -464,7 +502,70 @@ function createAdapter() {
       attach: externalAdapter.attach?.bind(externalAdapter),
     }
   }
+
+  // Wenn ein LLM-Endpunkt konfiguriert ist, wird dieser verwendet
+  if (LLM_CONFIG.endpoint) {
+    return createLlmAdapter()
+  }
+
   return createMockAdapter()
+}
+
+function createLlmAdapter() {
+  async function callLlm(userMessage, snapshot) {
+    const messages = [
+      { role: 'system', content: LLM_CONFIG.systemPrompt ?? '' },
+      ...snapshot.messages
+        .slice(-MAX_CONTEXT_MESSAGES)
+        .map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
+      { role: 'user', content: userMessage },
+    ]
+
+    const body = { model: LLM_CONFIG.model ?? 'llama3', messages, stream: false }
+
+    const headers = { 'Content-Type': 'application/json' }
+    if (LLM_CONFIG.apiKey) {
+      headers['Authorization'] = 'Bearer ' + LLM_CONFIG.apiKey
+    }
+
+    const response = await fetch(LLM_CONFIG.endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
+
+    if (!response.ok) {
+      throw new Error(`LLM-Anfrage fehlgeschlagen: HTTP ${response.status} ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    // Unterstützt OpenAI-Format und Ollama-Format
+    const rawContent =
+      data.choices?.[0]?.message?.content ?? data.message?.content ?? data.content ?? ''
+
+    // JSON aus der Antwort extrahieren (der Agent kann Markdown-Blöcke verwenden)
+    const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/) ?? [null, rawContent]
+    const jsonString = jsonMatch[1].trim()
+    try {
+      return JSON.parse(jsonString)
+    } catch {
+      throw new Error(
+        `LLM-Antwort konnte nicht als JSON geparst werden. Empfangener Inhalt: ${jsonString.slice(0, 200)}`,
+      )
+    }
+  }
+
+  return {
+    async handleInputMessage(inputMessage, snapshot) {
+      return await callLlm(inputMessage, snapshot)
+    },
+    async runCuratorSearch(requirements, snapshot) {
+      return await callLlm(
+        `Starte die Suche basierend auf diesen Requirements: ${requirements.join(' | ')}. Generiere einen konkreten Flugtrack.`,
+        snapshot,
+      )
+    },
+  }
 }
 
 function createMockAdapter() {
@@ -501,6 +602,8 @@ function createMockAdapter() {
   }
 }
 
+// ── Bridge (externe Steuerung der App über window.ISPIDER_APP) ───────────────
+
 function registerBridge() {
   window.ISPIDER_APP = {
     receiveAgentMessage(content) {
@@ -527,6 +630,8 @@ function registerBridge() {
     },
   }
 }
+
+// ── Mock-Hilfsfunktionen ─────────────────────────────────────────────────────
 
 function deriveRequirements(inputMessage, existingRequirements) {
   const nextRequirements = [...existingRequirements]
@@ -629,6 +734,8 @@ function buildTrack(origin, destination, points = 28) {
   })
 }
 
+// ── Normalisierung von Szenario-Daten ────────────────────────────────────────
+
 function normalizeScenarioPayload(payload) {
   const flights = Array.isArray(payload) ? payload : payload?.flights ?? payload?.scenario?.flights ?? []
   return flights
@@ -694,7 +801,11 @@ function normalizePoint(point) {
 function extractColumnMeta(source, index) {
   return Object.fromEntries(
     Object.entries(source)
-      .filter(([key, value]) => Array.isArray(value) && !['lat', 'latitude', 'latitude_deg', 'Latitude', 'lon', 'lng', 'long', 'longitude', 'longitude_deg', 'Longitude'].includes(key))
+      .filter(
+        ([key, value]) =>
+          Array.isArray(value) &&
+          !['lat', 'latitude', 'latitude_deg', 'Latitude', 'lon', 'lng', 'long', 'longitude', 'longitude_deg', 'Longitude'].includes(key),
+      )
       .map(([key, value]) => [key, value[index]]),
   )
 }
@@ -704,28 +815,7 @@ function normalizeRequirements(requirements) {
   return [...new Set(list.map((item) => item.trim()).filter(Boolean))]
 }
 
-function projectPoint(lat, lon) {
-  return {
-    x: ((lon + 180) / 360) * MAP_WIDTH,
-    y: ((90 - lat) / 180) * MAP_HEIGHT,
-  }
-}
-
-function buildGrid() {
-  const horizontalLines = [-60, -30, 0, 30, 60]
-    .map((lat) => {
-      const y = projectPoint(lat, 0).y
-      return `<line x1="0" y1="${y}" x2="${MAP_WIDTH}" y2="${y}" />`
-    })
-    .join('')
-  const verticalLines = [-120, -60, 0, 60, 120]
-    .map((lon) => {
-      const x = projectPoint(0, lon).x
-      return `<line x1="${x}" y1="0" x2="${x}" y2="${MAP_HEIGHT}" />`
-    })
-    .join('')
-  return horizontalLines + verticalLines
-}
+// ── Sonstige Hilfsfunktionen ─────────────────────────────────────────────────
 
 function formatMeta(meta) {
   const entries = Object.entries(meta ?? {})
