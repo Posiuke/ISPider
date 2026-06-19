@@ -1,0 +1,480 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  background:
+    radial-gradient(circle at top, rgba(118, 247, 255, 0.16), transparent 32%),
+    linear-gradient(180deg, #07101f 0%, #030712 100%);
+  color: #dbe4ff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --panel: rgba(8, 15, 30, 0.86);
+  --panel-border: rgba(126, 240, 255, 0.14);
+  --panel-shadow: 0 20px 60px rgba(3, 7, 18, 0.45);
+  --muted: #94a3b8;
+  --text-strong: #f8fbff;
+  --accent: #76f7ff;
+  --accent-2: #8b5cf6;
+  --track: #7dd3fc;
+  --track-active: #f8fafc;
+  --danger: #fb7185;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+code {
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(118, 247, 255, 0.12);
+  color: var(--accent);
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.app-shell {
+  width: min(1400px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 40px;
+  display: grid;
+  gap: 20px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 24px;
+  box-shadow: var(--panel-shadow);
+  backdrop-filter: blur(18px);
+}
+
+.panel-stack {
+  padding: 20px;
+}
+
+.map-panel {
+  padding: 24px;
+}
+
+.panel-header,
+.map-header,
+.map-meta,
+.chat-actions,
+.workflow-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.map-header {
+  margin-bottom: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2rem, 4vw, 3.1rem);
+  color: var(--text-strong);
+}
+
+h2 {
+  font-size: 1.25rem;
+  color: var(--text-strong);
+}
+
+.subtitle,
+.hint,
+.panel-state,
+.requirements-empty,
+.scenario-empty,
+.flight-card span,
+.flight-card small {
+  color: var(--muted);
+}
+
+.brand-badge {
+  min-width: 132px;
+  padding: 14px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, rgba(118, 247, 255, 0.14), rgba(139, 92, 246, 0.1));
+  border: 1px solid rgba(118, 247, 255, 0.24);
+  text-align: center;
+}
+
+.brand-badge svg {
+  width: 72px;
+  display: block;
+  margin: 0 auto 8px;
+  filter: drop-shadow(0 0 16px rgba(118, 247, 255, 0.35));
+}
+
+.map-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(118, 247, 255, 0.16);
+}
+
+.world-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1000 / 460;
+}
+
+.map-ocean {
+  fill: rgba(11, 20, 38, 0.92);
+}
+
+.map-grid line {
+  stroke: rgba(148, 163, 184, 0.12);
+  stroke-width: 1;
+}
+
+.map-continents path {
+  fill: rgba(92, 217, 255, 0.09);
+  stroke: rgba(118, 247, 255, 0.18);
+  stroke-width: 1.4;
+}
+
+.track-line {
+  fill: none;
+  stroke: url(#trackGradient);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.72;
+}
+
+.track-waypoint {
+  fill: #bfdbfe;
+  stroke: rgba(11, 17, 32, 0.9);
+  stroke-width: 1.5;
+}
+
+.track-label {
+  fill: #e2e8f0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.track-group.selected .track-line {
+  stroke-width: 5.5;
+  opacity: 1;
+}
+
+.track-group.selected .track-waypoint {
+  fill: var(--track-active);
+}
+
+.map-empty-state {
+  position: absolute;
+  inset: auto 24px 24px auto;
+  max-width: 320px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(8, 15, 30, 0.82);
+  border: 1px solid rgba(118, 247, 255, 0.18);
+  display: grid;
+  gap: 4px;
+}
+
+.map-meta {
+  margin-top: 16px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: var(--muted);
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 999px;
+  margin-right: 6px;
+}
+
+.dot.track {
+  background: var(--track);
+}
+
+.dot.waypoint {
+  background: #bfdbfe;
+}
+
+.dot.active {
+  background: var(--track-active);
+}
+
+.scenario-meta {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.flight-card,
+.scenario-empty {
+  width: 100%;
+  text-align: left;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.flight-card {
+  display: grid;
+  gap: 4px;
+}
+
+.flight-card.selected {
+  border-color: rgba(118, 247, 255, 0.55);
+  box-shadow: inset 0 0 0 1px rgba(118, 247, 255, 0.24);
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(320px, 0.95fr);
+  gap: 20px;
+}
+
+.chat-panel {
+  min-height: 580px;
+}
+
+.chat-log {
+  margin-top: 18px;
+  display: grid;
+  gap: 12px;
+  max-height: 430px;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.message {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  display: grid;
+  gap: 8px;
+}
+
+.message header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.message p {
+  white-space: pre-wrap;
+}
+
+.message-assistant {
+  background: linear-gradient(180deg, rgba(118, 247, 255, 0.1), rgba(15, 23, 42, 0.88));
+}
+
+.message-user {
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.chat-form {
+  margin-top: auto;
+  padding-top: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+textarea,
+input {
+  width: 100%;
+  color: var(--text-strong);
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+textarea:focus,
+input:focus {
+  outline: 2px solid rgba(118, 247, 255, 0.5);
+  outline-offset: 1px;
+}
+
+.primary-button,
+.secondary-button,
+.ghost-button {
+  border-radius: 999px;
+  padding: 0.88rem 1.2rem;
+  transition: transform 0.18s ease, opacity 0.18s ease, border-color 0.18s ease;
+}
+
+.primary-button {
+  color: #03101f;
+  background: linear-gradient(135deg, var(--accent), #d8b4fe);
+  font-weight: 700;
+}
+
+.secondary-button {
+  color: var(--text-strong);
+  background: rgba(118, 247, 255, 0.12);
+  border: 1px solid rgba(118, 247, 255, 0.2);
+}
+
+.ghost-button {
+  color: #fecdd3;
+  background: rgba(251, 113, 133, 0.08);
+  border: 1px solid rgba(251, 113, 133, 0.16);
+}
+
+.primary-button:hover,
+.secondary-button:hover,
+.ghost-button:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled,
+.ghost-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.side-stack {
+  display: grid;
+  gap: 20px;
+  align-content: start;
+}
+
+.requirements-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.requirements-list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.74);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.requirement-index {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(118, 247, 255, 0.12);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.workflow-actions {
+  margin-top: 18px;
+  display: grid;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.export-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+@media (max-width: 1080px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    width: min(100vw - 20px, 100%);
+    padding-top: 12px;
+  }
+
+  .map-panel,
+  .panel-stack {
+    padding: 18px;
+  }
+
+  .map-header,
+  .panel-header,
+  .map-meta,
+  .chat-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .map-empty-state {
+    position: static;
+    margin: 14px;
+  }
+}
