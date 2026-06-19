@@ -95,7 +95,7 @@ REGELN:
 - Extrahiere aus der Nutzereingabe ALLE erkennbaren Requirements (Route, Fluggerät, Zeitraum, Mission, Constraints).
 - Wenn du einen konkreten Flugtrack generierst, gib mindestens 8 Track-Punkte an (Großkreis-Route empfohlen).
 - Breitengrad (lat): -90 bis +90. Längengrad (lon): -180 bis +180.
-- Fehlen noch Informationen, fordere sie beim Nutzer an (in "message"), ohne ein Szenario zu erzeugen.
+- Falls Informationen fehlen, darfst du Rückfragen stellen, kannst aber trotzdem ein sinnvolles Szenario erzeugen.
 - Verwende deutsche Sprache für "message" und "status".`,
   },
 

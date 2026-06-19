@@ -12,6 +12,8 @@ npm run dev
 npm run build
 ```
 
+Hinweis zur Karte: Die Weltkarte läuft vollständig im Browser über **`plotly.js-dist-min`** (JavaScript). Es ist **kein Python-Plotly** nötig. Wichtig ist nur, die npm-Abhängigkeiten mit `npm install` zu installieren.
+
 ## Konfiguration
 
 Die Datei **`ispider.config.js`** (nicht im Git – aus `ispider.config.example.js` kopieren) steuert:
@@ -32,6 +34,7 @@ Vollständige Dokumentation: **[`docs/INTERFACES.md`](docs/INTERFACES.md)**
 - **Chat Window** – Konversationsansicht (Nutzer rechts, Agent links), Enter = Senden
 - **Requirements Window** mit Live-Stand der Such-Constraints
 - **Aktionen** für `Start Search`, `Export Scenario` und `Reset Session`
+- `Start Search` ist jederzeit möglich (auch ohne vorhandene Requirements)
 - Browser-Export als `.scenario`-Datei (Dateiname aus `ispider.config.js`)
 
 ## Bridge für Agenten-Integration
