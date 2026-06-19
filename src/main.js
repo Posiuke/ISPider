@@ -27,8 +27,6 @@ const AIRPORTS = {
 // Maximale Anzahl an Chatnachrichten, die als Kontext an das LLM gesendet werden
 const MAX_CONTEXT_MESSAGES = 8
 
-let plotlyInitialized = false
-
 const state = {
   messages: [
     {
@@ -41,6 +39,7 @@ const state = {
   requirements: [],
   scenario: { flights: [] },
   selectedFlightId: null,
+  plotlyInitialized: false,
   isAnalyzing: false,
   isSearching: false,
   exportPath: EXPORT_CONFIG.path ?? 'ispider-szenario.scenario',
@@ -285,6 +284,7 @@ async function handleResetSession() {
   state.requirements = []
   state.scenario = { flights: [] }
   state.selectedFlightId = null
+  state.plotlyInitialized = false
   state.status = 'Sitzung bereit'
   state.isAnalyzing = false
   state.isSearching = false
@@ -415,11 +415,11 @@ function renderPlotlyMap() {
     scrollZoom: true,
   }
 
-  if (plotlyInitialized) {
+  if (state.plotlyInitialized) {
     Plotly.react(refs.plotlyMap, traces, layout, config)
   } else {
     Plotly.newPlot(refs.plotlyMap, traces, layout, config)
-    plotlyInitialized = true
+    state.plotlyInitialized = true
 
     refs.plotlyMap.on('plotly_click', (data) => {
       if (data.points.length) {
