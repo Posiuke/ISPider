@@ -24,7 +24,10 @@ const AIRPORTS = {
   SYD: { label: 'Sydney', lat: -33.9399, lon: 151.1753 },
 }
 
-// ── Anwendungszustand ────────────────────────────────────────────────────────
+// Maximale Anzahl an Chatnachrichten, die als Kontext an das LLM gesendet werden
+const MAX_CONTEXT_MESSAGES = 8
+
+
 const state = {
   messages: [
     {
@@ -94,9 +97,9 @@ app.innerHTML = `
 
         <form class="chat-form" data-chat-form>
           <label class="sr-only" for="chat-input">Nachricht an den Analyzing Agent</label>
-          <textarea id="chat-input" name="input_message" rows="3" maxlength="1500" placeholder="Beschreibe Route, Zeitraum, Flughäfen, Fluggerät … (Enter = Senden, Shift+Enter = Zeilenumbruch)"></textarea>
+          <textarea id="chat-input" name="input_message" rows="3" maxlength="1500" placeholder="Beschreibe Route, Zeitraum, Flughäfen, Fluggerät …"></textarea>
           <div class="chat-actions">
-            <p class="hint">Nachricht wird als <code>input_message</code> an den Workflow übergeben.</p>
+            <p class="hint">Enter = Senden · Shift+Enter = Zeilenumbruch · <code>input_message</code> an den Workflow</p>
             <button class="primary-button" type="submit">Senden</button>
           </div>
         </form>
@@ -513,7 +516,7 @@ function createLlmAdapter() {
     const messages = [
       { role: 'system', content: LLM_CONFIG.systemPrompt ?? '' },
       ...snapshot.messages
-        .slice(-8)
+        .slice(-MAX_CONTEXT_MESSAGES)
         .map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
       { role: 'user', content: userMessage },
     ]
@@ -532,7 +535,7 @@ function createLlmAdapter() {
     })
 
     if (!response.ok) {
-      throw new Error(`LLM-Anfrage fehlgeschlagen: HTTP ${response.status}`)
+      throw new Error(`LLM-Anfrage fehlgeschlagen: HTTP ${response.status} ${response.statusText}`)
     }
 
     const data = await response.json()
@@ -542,7 +545,14 @@ function createLlmAdapter() {
 
     // JSON aus der Antwort extrahieren (der Agent kann Markdown-Blöcke verwenden)
     const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/) ?? [null, rawContent]
-    return JSON.parse(jsonMatch[1].trim())
+    const jsonString = jsonMatch[1].trim()
+    try {
+      return JSON.parse(jsonString)
+    } catch {
+      throw new Error(
+        `LLM-Antwort konnte nicht als JSON geparst werden. Empfangener Inhalt: ${jsonString.slice(0, 200)}`,
+      )
+    }
   }
 
   return {
